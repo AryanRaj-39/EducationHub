@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Homework App</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      background: linear-gradient(135deg, #c3ecf9, #a0c4ff);
+    }
+    .hidden { display: none; }
+    .container {
+      max-width: 600px;
+      margin: auto;
+      padding: 20px;
+    }
+    .box {
+      background: white;
+      padding: 20px;
+      margin-top: 50px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+    }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .dark-mode {
+      background: #121212;
+      color: white;
+    }
+    .dark-mode .box {
+      background: #1e1e1e;
+    }
+    .dark-mode input,
+    .dark-mode select,
+    .dark-mode textarea,
+    .dark-mode button {
+      background: #333;
+      color: white;
+      border: 1px solid #555;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Login Page -->
+    <div id="loginPage" class="box">
+      <h2>Login to Homework App</h2>
+      <input type="text" id="username" placeholder="Enter your name (students)" />
+      <input type="password" id="adminPass" placeholder="Admin password (only for admins)" />
+      <button onclick="login()">Login</button>
+    </div>
+
+    <!-- Home Page -->
+    <div id="homePage" class="box hidden">
+      <h2>Welcome, <span id="studentName"></span></h2>
+      <button onclick="logout()">Logout</button>
+      <label for="subjectFilter">Filter by Subject:</label>
+      <select id="subjectFilter" onchange="filterHomework()">
+        <option value="">All</option>
+        <option>Sanskrit</option>
+        <option>Maths</option>
+        <option>Science</option>
+        <option>Hindi</option>
+        <option>English</option>
+        <option>Computer</option>
+        <option>Naitik Shiksha</option>
+      </select>
+      <ul id="homeworkList"></ul>
+    </div>
+
+    <!-- Admin Page -->
+    <div id="adminPage" class="box hidden">
+      <h2>Admin Dashboard</h2>
+      <button onclick="logout()">Logout</button>
+      <h3>Post Homework</h3>
+      <select id="subject">
+        <option>Sanskrit</option>
+        <option>Maths</option>
+        <option>Science</option>
+        <option>Hindi</option>
+        <option>English</option>
+        <option>Computer</option>
+        <option>Naitik Shiksha</option>
+      </select>
+      <input type="date" id="date" />
+      <textarea id="description" placeholder="Enter homework"></textarea>
+      <button onclick="postHomework()">Send Homework</button>
+
+      <h3>All Homework</h3>
+      <ul id="adminHomeworkList"></ul>
+
+      <h3>Student Login History</h3>
+      <ul id="loginHistory"></ul>
+    </div>
+
+    <!-- Toggle Dark Mode -->
+    <button onclick="toggleDarkMode()">Toggle Dark Mode</button>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAP9K06BauR4LE7QImMz1dA2GENa13p1mk",
+      authDomain: "homework-web-3e818.firebaseapp.com",
+      databaseURL: "https://homework-web-3e818-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "homework-web-3e818",
+      storageBucket: "homework-web-3e818.appspot.com",
+      messagingSenderId: "367099043591",
+      appId: "1:367099043591:web:3e201f9e25cf6641f66fa2"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const ADMIN_PASSWORDS = ["Aryan Raj", "aryan25070"];
+
+    function login() {
+      const name = document.getElementById("username").value.trim();
+      const password = document.getElementById("adminPass").value.trim();
+
+      if (password && ADMIN_PASSWORDS.includes(password)) {
+        localStorage.setItem("role", "admin");
+        showPage("admin");
+        fetchHomework("adminHomeworkList");
+        fetchLoginHistory();
+      } else if (name) {
+        localStorage.setItem("role", "user");
+        localStorage.setItem("username", name);
+        db.ref("loginHistory").push({ name: name, timestamp: Date.now() });
+        document.getElementById("studentName").textContent = name;
+        showPage("home");
+        fetchHomework("homeworkList");
+      } else {
+        alert("Enter your name or admin password.");
+      }
+    }
+
+    function logout() {
+      localStorage.clear();
+      showPage("login");
+    }
+
+    function showPage(role) {
+      document.getElementById("loginPage").classList.add("hidden");
+      document.getElementById("homePage").classList.add("hidden");
+      document.getElementById("adminPage").classList.add("hidden");
+      if (role === "admin") document.getElementById("adminPage").classList.remove("hidden");
+      if (role === "home") document.getElementById("homePage").classList.remove("hidden");
+      if (role === "login") document.getElementById("loginPage").classList.remove("hidden");
+    }
+
+    function postHomework() {
+      const subject = document.getElementById("subject").value;
+      const date = document.getElementById("date").value;
+      const description = document.getElementById("description").value;
+      if (!subject || !date || !description) return alert("Please fill all fields");
+      const id = db.ref("homework").push().key;
+      db.ref("homework/" + id).set({ subject, date, description, timestamp: Date.now() });
+      alert("Homework posted!");
+      fetchHomework("adminHomeworkList");
+    }
+
+    function fetchHomework(listId) {
+      db.ref("homework").once("value", snapshot => {
+        const list = document.getElementById(listId);
+        list.innerHTML = "";
+        const data = snapshot.val();
+        for (let key in data) {
+          const hw = data[key];
+          // Auto delete if older than 30 days
+          if (Date.now() - hw.timestamp > 30 * 24 * 60 * 60 * 1000) {
+            db.ref("homework/" + key).remove();
+            continue;
+          }
+          const li = document.createElement("li");
+          li.textContent = `[${hw.subject}] ${hw.date} - ${hw.description}`;
+          list.appendChild(li);
+        }
+      });
+    }
+
+    function filterHomework() {
+      const selected = document.getElementById("subjectFilter").value;
+      db.ref("homework").once("value", snapshot => {
+        const list = document.getElementById("homeworkList");
+        list.innerHTML = "";
+        const data = snapshot.val();
+        for (let key in data) {
+          const hw = data[key];
+          if (selected && hw.subject !== selected) continue;
+          const li = document.createElement("li");
+          li.textContent = `[${hw.subject}] ${hw.date} - ${hw.description}`;
+          list.appendChild(li);
+        }
+      });
+    }
+
+    function fetchLoginHistory() {
+      db.ref("loginHistory").once("value", snapshot => {
+        const list = document.getElementById("loginHistory");
+        list.innerHTML = "";
+        const data = snapshot.val();
+        for (let key in data) {
+          const login = data[key];
+          const li = document.createElement("li");
+          li.textContent = `${login.name} - ${new Date(login.timestamp).toLocaleString()}`;
+          list.appendChild(li);
+        }
+      });
+    }
+
+    function toggleDarkMode() {
+      document.body.classList.toggle("dark-mode");
+    }
+
+    window.onload = function() {
+      const role = localStorage.getItem("role");
+      const name = localStorage.getItem("username");
+      if (role === "admin") {
+        showPage("admin");
+        fetchHomework("adminHomeworkList");
+        fetchLoginHistory();
+      } else if (role === "user") {
+        document.getElementById("studentName").textContent = name;
+        showPage("home");
+        fetchHomework("homeworkList");
+      } else {
+        showPage("login");
+      }
+    }
+  </script>
+</body>
+</html>
